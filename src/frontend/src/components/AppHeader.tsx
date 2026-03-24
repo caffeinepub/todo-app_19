@@ -1,20 +1,44 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { CheckSquare } from "lucide-react";
+import { BarChart2, CheckSquare, Settings } from "lucide-react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useGetUserProfile } from "../hooks/useUserProfile";
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onOpenSettings: () => void;
+  onSignOut: () => void;
+  onOpenStats?: () => void;
+}
+
+export function AppHeader({
+  onOpenSettings,
+  onSignOut,
+  onOpenStats,
+}: AppHeaderProps) {
   const { login, clear, loginStatus, identity, isInitializing } =
     useInternetIdentity();
+  const { data: profile } = useGetUserProfile();
 
   const principal = identity?.getPrincipal().toString();
   const shortPrincipal = principal
     ? `${principal.slice(0, 5)}...${principal.slice(-3)}`
     : null;
-  const initials = principal ? principal.slice(0, 2).toUpperCase() : "?";
+
+  const displayName = profile?.name || null;
+  const displayLabel = displayName || shortPrincipal;
+  const initials = displayName
+    ? displayName.slice(0, 2).toUpperCase()
+    : principal
+      ? principal.slice(0, 2).toUpperCase()
+      : "?";
 
   const isLoggedIn = !!identity;
   const isLoggingIn = loginStatus === "logging-in";
+
+  const handleSignOut = () => {
+    clear();
+    onSignOut();
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card shadow-xs">
@@ -40,11 +64,31 @@ export function AppHeader() {
             <>
               <button
                 type="button"
-                onClick={clear}
+                onClick={handleSignOut}
                 className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:flex"
                 data-ocid="auth.logout.button"
               >
                 Sign out
+              </button>
+              {onOpenStats && (
+                <button
+                  type="button"
+                  onClick={onOpenStats}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label="View stats"
+                  data-ocid="stats.open_modal_button"
+                >
+                  <BarChart2 className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Open settings"
+                data-ocid="settings.open_modal_button"
+              >
+                <Settings className="h-4 w-4" />
               </button>
               <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
@@ -53,7 +97,7 @@ export function AppHeader() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden text-sm font-medium text-foreground sm:block">
-                  {shortPrincipal}
+                  {displayLabel}
                 </span>
               </div>
             </>

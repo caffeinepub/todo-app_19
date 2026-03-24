@@ -4,9 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PersistedTodo, TodoId } from "../backend.d";
+import {
+  getYesterdaySnapshot,
+  updateSnapshot,
+} from "../hooks/useDailySnapshot";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddTodo,
@@ -25,6 +29,33 @@ function formatDate(timestamp: bigint) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(ms));
+}
+
+function DeltaBadge({
+  current,
+  yesterday,
+}: { current: number; yesterday: number | null }) {
+  if (yesterday === null) return null;
+  const delta = current - yesterday;
+  if (delta > 0) {
+    return (
+      <span className="ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+        ▲ {delta}
+      </span>
+    );
+  }
+  if (delta < 0) {
+    return (
+      <span className="ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+        ▼ {Math.abs(delta)}
+      </span>
+    );
+  }
+  return (
+    <span className="ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+      = 0
+    </span>
+  );
 }
 
 function TodoRow({
@@ -128,7 +159,7 @@ export function TodoSection() {
   const isLoggedIn = !!identity;
 
   const [taskInput, setTaskInput] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("active");
   const [pendingToggle, setPendingToggle] = useState<TodoId | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TodoId | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +172,17 @@ export function TodoSection() {
   const allTodos: TodoEntry[] = todos as TodoEntry[];
   const activeTodos = allTodos.filter(([, t]) => !t.completed);
   const completedTodos = allTodos.filter(([, t]) => t.completed);
+
+  const activeCount = activeTodos.length;
+  const completedCount = completedTodos.length;
+
+  useEffect(() => {
+    if (!isLoading && isLoggedIn) {
+      updateSnapshot(activeCount, completedCount);
+    }
+  }, [activeCount, completedCount, isLoading, isLoggedIn]);
+
+  const yesterdaySnap = getYesterdaySnapshot();
 
   async function handleAddTask(e: FormEvent) {
     e.preventDefault();
@@ -252,91 +294,102 @@ export function TodoSection() {
           </motion.div>
         )}
 
-        {/* Todo card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="overflow-hidden rounded-xl border border-border bg-card shadow-card"
-        >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="border-b border-border px-5">
-              <TabsList className="h-12 gap-0 bg-transparent p-0">
-                <TabsTrigger
-                  value="all"
-                  className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
-                  data-ocid="todo.filter.tab"
-                >
-                  All Tasks ({allTodos.length})
-                </TabsTrigger>
-                <TabsTrigger
-                  value="active"
-                  className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
-                  data-ocid="todo.active.tab"
-                >
-                  Active ({activeTodos.length})
-                </TabsTrigger>
-                <TabsTrigger
-                  value="completed"
-                  className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
-                  data-ocid="todo.completed.tab"
-                >
-                  Completed ({completedTodos.length})
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            {["all", "active", "completed"].map((tab) => (
-              <TabsContent
-                key={tab}
-                value={tab}
-                className="mt-0 focus-visible:ring-0"
-              >
-                {isLoading ? (
-                  <div
-                    className="flex justify-center py-12"
-                    data-ocid="todo.loading_state"
+        {/* Todo card — only visible when authenticated */}
+        {isLoggedIn && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="overflow-hidden rounded-xl border border-border bg-card shadow-card"
+          >
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <div className="border-b border-border px-5">
+                <TabsList className="h-12 gap-0 bg-transparent p-0">
+                  <TabsTrigger
+                    value="all"
+                    className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
+                    data-ocid="todo.filter.tab"
                   >
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : tabTodos.length === 0 ? (
-                  <EmptyState
-                    message={
-                      tab === "completed"
-                        ? "No completed tasks yet"
-                        : tab === "active"
-                          ? "No active tasks \u2014 you\u2019re all caught up! \uD83C\uDF89"
-                          : "No tasks yet. Add one above!"
-                    }
-                  />
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {tabTodos.map((entry, i) => (
-                      <TodoRow
-                        key={entry[0].toString()}
-                        entry={entry}
-                        index={i}
-                        onToggle={handleToggle}
-                        onDelete={handleDelete}
-                        isToggling={pendingToggle === entry[0]}
-                        isDeleting={pendingDelete === entry[0]}
-                      />
-                    ))}
-                  </AnimatePresence>
-                )}
-              </TabsContent>
-            ))}
-          </Tabs>
+                    All Tasks ({allTodos.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="active"
+                    className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
+                    data-ocid="todo.active.tab"
+                  >
+                    Active ({activeTodos.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="completed"
+                    className="h-12 rounded-none bg-transparent px-4 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary"
+                    data-ocid="todo.completed.tab"
+                  >
+                    Completed ({completedTodos.length})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
-          {/* Footer summary */}
-          <div className="flex items-center justify-between border-t border-border bg-secondary/30 px-5 py-3 text-xs text-muted-foreground">
-            <span>
-              {activeTodos.length} task{activeTodos.length !== 1 ? "s" : ""}{" "}
-              remaining
-            </span>
-            <span>Completed: {completedTodos.length}</span>
-          </div>
-        </motion.div>
+              {["all", "active", "completed"].map((tab) => (
+                <TabsContent
+                  key={tab}
+                  value={tab}
+                  className="mt-0 focus-visible:ring-0"
+                >
+                  {isLoading ? (
+                    <div
+                      className="flex justify-center py-12"
+                      data-ocid="todo.loading_state"
+                    >
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : tabTodos.length === 0 ? (
+                    <EmptyState
+                      message={
+                        tab === "completed"
+                          ? "No completed tasks yet"
+                          : tab === "active"
+                            ? "No active tasks \u2014 you\u2019re all caught up! \uD83C\uDF89"
+                            : "No tasks yet. Add one above!"
+                      }
+                    />
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {tabTodos.map((entry, i) => (
+                        <TodoRow
+                          key={entry[0].toString()}
+                          entry={entry}
+                          index={i}
+                          onToggle={handleToggle}
+                          onDelete={handleDelete}
+                          isToggling={pendingToggle === entry[0]}
+                          isDeleting={pendingDelete === entry[0]}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+
+            {/* Footer summary with delta badges */}
+            <div className="flex items-center justify-between border-t border-border bg-secondary/30 px-5 py-3 text-xs text-muted-foreground">
+              <span className="flex items-center">
+                {activeCount} task{activeCount !== 1 ? "s" : ""} remaining
+                <DeltaBadge
+                  current={activeCount}
+                  yesterday={yesterdaySnap?.active ?? null}
+                />
+              </span>
+              <span className="flex items-center">
+                Completed: {completedCount}
+                <DeltaBadge
+                  current={completedCount}
+                  yesterday={yesterdaySnap?.completed ?? null}
+                />
+              </span>
+            </div>
+          </motion.div>
+        )}
       </div>
     </section>
   );
