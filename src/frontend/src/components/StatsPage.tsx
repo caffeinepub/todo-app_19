@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -32,7 +33,6 @@ export function StatsPage({ onBack }: StatsPageProps) {
   const activeTodos = allTodos.filter(([, t]) => !t.completed);
   const completedTodos = allTodos.filter(([, t]) => t.completed);
 
-  // Group added tasks per day (last 7 days)
   const last7Days = getSnapshotHistory(7).map((s) => s.date);
   const addedPerDay: Record<string, number> = {};
   for (const d of last7Days) addedPerDay[d] = 0;
@@ -44,20 +44,15 @@ export function StatsPage({ onBack }: StatsPageProps) {
     }
   }
 
-  const addedChartData = last7Days.map((date) => ({
-    date: formatDateLabel(date),
-    tasks: addedPerDay[date] ?? 0,
-  }));
-
   const snapshotHistory = getSnapshotHistory(7);
-  const completedChartData = snapshotHistory.map((s) => ({
-    date: formatDateLabel(s.date),
-    completed: s.completed,
+  const combinedChartData = last7Days.map((date, i) => ({
+    date: formatDateLabel(date),
+    added: addedPerDay[date] ?? 0,
+    completed: snapshotHistory[i]?.completed ?? 0,
   }));
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      {/* Back button */}
       <button
         type="button"
         onClick={onBack}
@@ -130,86 +125,48 @@ export function StatsPage({ onBack }: StatsPageProps) {
             </Card>
           </div>
 
-          {/* Tasks Added chart */}
-          <Card className="mb-6" data-ocid="stats.added.card">
+          {/* Combined chart */}
+          <Card data-ocid="stats.combined.card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tasks Added</CardTitle>
+              <CardTitle className="text-base">
+                Tasks Added vs Completed
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={220}>
                 <BarChart
-                  data={addedChartData}
+                  data={combinedChartData}
                   margin={{ top: 4, right: 8, bottom: 0, left: -20 }}
                 >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-border"
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
+                      background: "#ffffff",
+                      border: "1px solid #e2e8f0",
                       borderRadius: 8,
                       fontSize: 12,
                     }}
+                    labelStyle={{ color: "#1e293b" }}
+                    itemStyle={{ color: "#1e293b" }}
                   />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                   <Bar
-                    dataKey="tasks"
-                    fill="hsl(var(--primary))"
+                    dataKey="added"
+                    fill="#3b82f6"
                     radius={[4, 4, 0, 0]}
                     name="Added"
                   />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Tasks Completed chart */}
-          <Card data-ocid="stats.completed.card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tasks Completed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart
-                  data={completedChartData}
-                  margin={{ top: 4, right: 8, bottom: 0, left: -20 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-border"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
                   <Bar
                     dataKey="completed"
-                    fill="hsl(var(--chart-2, 142 71% 45%))"
+                    fill="#22c55e"
                     radius={[4, 4, 0, 0]}
                     name="Completed"
                   />

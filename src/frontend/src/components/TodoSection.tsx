@@ -34,19 +34,30 @@ function formatDate(timestamp: bigint) {
 function DeltaBadge({
   current,
   yesterday,
-}: { current: number; yesterday: number | null }) {
+  invert = false,
+}: { current: number; yesterday: number | null; invert?: boolean }) {
   if (yesterday === null) return null;
   const delta = current - yesterday;
   if (delta > 0) {
+    const color = invert
+      ? "bg-red-500/15 text-red-600 dark:text-red-400"
+      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
     return (
-      <span className="ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+      <span
+        className={`ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full ${color}`}
+      >
         ▲ {delta}
       </span>
     );
   }
   if (delta < 0) {
+    const color = invert
+      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+      : "bg-red-500/15 text-red-600 dark:text-red-400";
     return (
-      <span className="ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+      <span
+        className={`ml-1.5 inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full ${color}`}
+      >
         ▼ {Math.abs(delta)}
       </span>
     );
@@ -378,6 +389,7 @@ export function TodoSection() {
                 <DeltaBadge
                   current={activeCount}
                   yesterday={yesterdaySnap?.active ?? null}
+                  invert
                 />
               </span>
               <span className="flex items-center">
